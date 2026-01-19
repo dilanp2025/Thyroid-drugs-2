@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thyroid Drugs — Drag & Drop (Blue Text Included)</title>
+<style>
+  :root{
+    --bg:#050816; --card:#101827; --ink:#e8eefc; --muted:#9ca3c7;
+    --ok:#22c55e; --bad:#ef4444; --accent:#6366f1;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 5% -10%, #1e293b, #020617 55%);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  header{padding:18px 20px 0}
+  h1{margin:0 0 6px; font-size:clamp(20px,3.2vw,30px); font-weight:850}
+  p.lead{margin:0; color:var(--muted); max-width:1000px}
+  .wrap{display:grid; gap:16px; padding:10px 20px 26px}
+  @media (min-width:1000px){ .wrap{grid-template-columns:1fr 1fr;} }
+  .panel{
+    background:linear-gradient(180deg,#111827,#020617);
+    border-radius:16px;
+    border:1px solid #1f2937;
+    padding:16px;
+    box-shadow:0 18px 45px rgba(0,0,0,.55);
+  }
+  .panel h2{margin:0 0 10px; font-size:18px; color:#c7d2fe}
+  .list,.grid{display:grid; gap:10px}
+  .list{grid-auto-rows:minmax(48px,auto)}
+  .pill{
+    background:#020617;
+    border-radius:12px;
+    border:1px solid #293548;
+    padding:10px 12px;
+    font-weight:750;
+    cursor:grab;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    transition:transform .08s ease, border-color .12s ease;
+  }
+  .pill:hover{border-color:#6366f1}
+  .pill:active{transform:scale(.98); cursor:grabbing}
+  .pill.lock{cursor:default; opacity:.55; border-color:#374151}
+  .desc{
+    border-radius:12px;
+    border:1.5px dashed #283548;
+    padding:12px;
+    min-height:72px;
+    background:#020617;
+    display:grid;
+    align-items:center;
+    transition:border-color .12s ease, background .12s ease;
+  }
+  .desc .slotTitle{font-size:13px; font-weight:850; color:#c7d2fe; margin-bottom:4px}
+  .desc .text{font-size:14px; line-height:1.34; color:#e5e7eb}
+  .desc .accept{font-size:12px; font-style:italic; color:#9ca3c7; margin-top:6px}
+  .desc.correct{border-color:var(--ok); background:rgba(34,197,94,.08)}
+  .desc.wrong{border-color:var(--bad); background:rgba(239,68,68,.08)}
+  .footer{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
+    margin-top:10px;
+  }
+  .btn{
+    border:none; border-radius:999px; padding:9px 14px;
+    font-weight:850; cursor:pointer;
+    background:linear-gradient(180deg,#6366f1,#4f46e5);
+    color:white; box-shadow:0 8px 25px rgba(79,70,229,.55);
+  }
+  .btn.secondary{
+    background:#111827; color:#e5e7eb; box-shadow:none; border:1px solid #374151;
+  }
+  .score{font-weight:850}
+  .tiny{font-size:12px; color:#9ca3c7}
+  .tag{
+    display:inline-block; padding:.2em .6em; border-radius:999px;
+    border:1px solid #374151; font-size:11px; color:#c7d2fe;
+  }
+  .bucket{display:flex; gap:6px; flex-wrap:wrap}
+  .blue{
+    color:#4ea1ff;
+    font-weight:900;
+  }
+</style>
+</head>
+
+<body>
+<header>
+  <h1>Thyroid Drugs — Drag & Drop Match 🦋</h1>
+  <p class="lead">
+    Drag each <b>drug name</b> (left) to the matching <b>description</b> (right). Shuffles on load and via <b>Shuffle</b>.
+    Any <span class="blue">blue text</span> from the lecture is included inside the relevant description. :contentReference[oaicite:1]{index=1}
+  </p>
+</header>
+
+<div class="wrap">
+  <section class="panel">
+    <h2>Drugs</h2>
+    <div id="drugList" class="list"></div>
+    <div class="footer">
+      <div class="bucket" id="legend"></div>
+      <div>
+        <button id="shuffle" class="btn">Shuffle</button>
+        <button id="reset" class="btn secondary">Reset</button>
+      </div>
+    </div>
+    <p class="tiny">Source: LECT_Drugs for Thyroid (Staudinger). :contentReference[oaicite:2]{index=2}</p>
+  </section>
+
+  <section class="panel">
+    <h2>Descriptions</h2>
+    <div id="descGrid" class="grid"></div>
+    <div class="footer">
+      <div id="scoreArea" class="score">0 / 10 correct</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ITEMS = [
+  // Thyroid agents (from drug list page)
+  {id:"levothyroxine", label:"Levothyroxine (T4)", group:"Thyroid agent",
+   desc:`Thyroid agent (T4) used to treat thyroid hormone deficiency; manufactured thyroxine (T4). Max effect may take up to six weeks; dosing based on TSH and T4; converted to T3. :contentReference[oaicite:3]{index=3}`},
+
+  {id:"liothyronine", label:"Liothyronine (T3)", group:"Thyroid agent",
+   desc:`Thyroid agent (T3). Listed as a thyroid replacement option in the lecture drug list. :contentReference[oaicite:4]{index=4}`},
+
+  {id:"liotrix", label:"Liotrix (T4:T3 4:1)", group:"Thyroid agent",
+   desc:`Thyroid agent: combination thyroid hormone listed as a 4:1 ratio of T4:T3. :contentReference[oaicite:5]{index=5}`},
+
+  {id:"thyroid_desiccated", label:"Thyroid desiccated", group:"Thyroid agent",
+   desc:`Thyroid agent listed for hypothyroidism therapy in the lecture drug list. :contentReference[oaicite:6]{index=6}`},
+
+  // Anti-thyroid agents
+  {id:"radioiodine", label:"Radioactive iodine (I¹³¹)", group:"Anti-thyroid agent",
+   desc:`Used for thyroid cancer therapy: thyroid absorbs radioactive iodine; radiation destroys the thyroid gland and cancer cells that take up iodine; little effect on the body.
+   <span class="blue">Contraindicated in pregnant women (Category D)</span>. :contentReference[oaicite:7]{index=7}`},
+
+  {id:"potassium_iodide", label:"Potassium iodide", group:"Anti-thyroid agent",
+   desc:`Stable iodine. Blocks iodine uptake. Used for hyperthyroidism, iodine deficiency, and to prepare thyroid gland for surgical removal; also protects thyroid from radiation exposure; shrinks thyroid gland; decreases thyroid hormone production; does not affect heart rate or produce irregular heartbeat. :contentReference[oaicite:8]{index=8}`},
+
+  {id:"methimazole", label:"Methimazole", group:"Anti-thyroid agent (thioamide)",
+   desc:`Anti-thyroid drug for hyperthyroidism (Graves’ disease).
+   <span class="blue">Thioamide group of medications — Blocks iodide organification</span>.
+   Also inhibits thyroperoxidase (necessary step in T3/T4 synthesis). Major side effects listed include agranulocytosis/leukopenia/thrombocytopenia/aplastic anemia/liver inflammation. :contentReference[oaicite:9]{index=9}`},
+
+  {id:"ptu", label:"Propylthiouracil (PTU)", group:"Anti-thyroid agent (thioamide)",
+   desc:`Thioamide for hyperthyroidism: inhibits synthesis of thyroid hormones AND inhibits conversion of T4→T3 in peripheral tissues; does not inactivate pre-existing T4/T3; may be effective for thyroid storm. :contentReference[oaicite:10]{index=10}`},
+
+  // Required add-ons
+  {id:"propranolol", label:"Propranolol", group:"Adjunct (beta blocker)",
+   desc:`For thyrotoxicosis (thyroid storm or symptomatic hyperthyroidism): non-selective beta-1 and beta-2 blocker.
+   <span class="blue">Widely used to reduce heart rate and tremor during thyroid storm;</span>
+   <span class="blue">Inhibits conversion of T4 to the more biologically active hormone, T3, which occurs in peripheral tissues.</span>
+   <span class="blue">May help reverse reduced systemic vascular resistance.</span> :contentReference[oaicite:11]{index=11}`},
+
+  {id:"amiodarone", label:"Amiodarone", group:"Drug affecting thyroid function",
+   desc:`Anti-arrhythmic drug (ventricular arrhythmia, atrial fibrillation; prevention of ventricular tachyarrhythmias in high-risk patients). Can cause type II amiodarone-induced thyrotoxicosis (thyroid tissue destruction). Baseline TSH, free T3, T4 recommended; repeat every 6–12 months; watch for hyperthyroid symptoms. :contentReference[oaicite:12]{index=12}`}
+];
+
+const $  = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const shuffle = arr => { for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; };
+
+let picked = null;
+
+function buildGame(){
+  const drugList = $("#drugList");
+  const descGrid = $("#descGrid");
+  drugList.innerHTML = "";
+  descGrid.innerHTML = "";
+
+  const drugs = shuffle([...ITEMS]);
+  const targets = shuffle([...ITEMS]);
+
+  const groups = [...new Set(ITEMS.map(i => i.group))];
+  $("#legend").innerHTML = groups.map(g => `<span class="tag">${g}</span>`).join("");
+
+  drugs.forEach(d => {
+    const el = document.createElement("div");
+    el.className = "pill";
+    el.textContent = d.label;
+    el.dataset.id = d.id;
+    el.title = d.group;
+    el.setAttribute("draggable","true");
+    el.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", d.id));
+    el.addEventListener("click", () => { if(!el.classList.contains("lock")) picked = d.id; });
+    drugList.appendChild(el);
+  });
+
+  targets.forEach(t => {
+    const box = document.createElement("div");
+    box.className = "desc";
+    box.dataset.id = t.id;
+    box.innerHTML = `
+      <div class="slotTitle">Description</div>
+      <div class="text">${t.desc}</div>
+      <div class="accept">Drop the matching drug here</div>
+    `;
+    box.addEventListener("dragover", e => e.preventDefault());
+    box.addEventListener("drop", e => { e.preventDefault(); handleDrop(e.dataTransfer.getData("text/plain"), box); });
+    box.addEventListener("click", () => { if(picked) handleDrop(picked, box); });
+    descGrid.appendChild(box);
+  });
+
+  updateScore();
+}
+
+function handleDrop(id, box){
+  if(!id || box.classList.contains("correct")) return;
+  const pill = document.querySelector(`.pill[data-id="${id}"]`);
+  if(!pill || pill.classList.contains("lock")) return;
+
+  if(id === box.dataset.id){
+    box.classList.remove("wrong");
+    box.classList.add("correct");
+    box.querySelector(".accept").innerHTML = `✅ Matched: <b>${pill.textContent}</b>`;
+    pill.classList.add("lock");
+    pill.setAttribute("draggable","false");
+  } else {
+    box.classList.add("wrong");
+    box.querySelector(".accept").textContent = "❌ Not a match, try again.";
+    setTimeout(() => {
+      box.classList.remove("wrong");
+      box.querySelector(".accept").textContent = "Drop the matching drug here";
+    }, 750);
+  }
+  picked = null;
+  updateScore();
+}
+
+function updateScore(){
+  const correct = $$(".desc.correct").length;
+  $("#scoreArea").textContent = `${correct} / ${ITEMS.length} correct` + (correct===ITEMS.length ? " – All matched! 🎉" : "");
+}
+
+$("#shuffle").addEventListener("click", buildGame);
+$("#reset").addEventListener("click", () => {
+  $$(".pill").forEach(p => { p.classList.remove("lock"); p.setAttribute("draggable","true"); });
+  $$(".desc").forEach(d => { d.classList.remove("correct","wrong"); d.querySelector(".accept").textContent = "Drop the matching drug here"; });
+  updateScore();
+});
+
+buildGame();
+</script>
+</body>
+</html>
